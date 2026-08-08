@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>FlowTimer · 番茄钟</title>
+<style>
+:root{--bg:#F5F5F5;--card:#FFF;--accent:#7C4DFF;--fg:#212121;--fg2:#757575}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Microsoft YaHei UI','PingFang SC',sans-serif;background:var(--bg);color:var(--fg);max-width:420px;margin:0 auto;padding:8px;min-height:100vh;display:flex;flex-direction:column}
+.title-bar{background:var(--accent);color:#fff;padding:10px 16px;border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:space-between}
+.title-bar h1{font-size:16px;margin:0}
+.title-bar .sub{font-size:10px;opacity:0.7}
+.info-bar{display:flex;gap:12px;padding:5px 14px;background:#F3E5FF;border:1px solid var(--accent);border-top:none;font-size:11px;font-weight:600}
+.info-bar a{color:var(--accent);text-decoration:none}
+.card{background:var(--card);border:1px solid #E0E0E0;border-top:none;border-radius:0 0 8px 8px;padding:16px;text-align:center;flex:1}
+.timer{font-family:'Consolas',monospace;font-size:72px;font-weight:700;color:var(--accent);margin:16px 0;transition:color .3s}
+.timer.urgent{color:#E53935}
+.status{font-size:13px;color:var(--fg2);margin-bottom:16px}
+.presets{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+.preset-btn{padding:8px 14px;border:1px solid #E0D0FF;border-radius:6px;background:var(--card);color:var(--accent);cursor:pointer;font-size:13px;font-weight:700}
+.preset-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.custom-row{display:flex;gap:8px;justify-content:center;align-items:center;margin-bottom:20px}
+.custom-row input{width:60px;padding:6px;text-align:center;border:1px solid #E0D0FF;border-radius:4px;font-size:13px;background:#F8F4FF}
+.custom-row button{padding:6px 14px;border:none;border-radius:4px;background:#E0D0FF;color:var(--accent);cursor:pointer;font-size:12px;font-weight:700}
+.btns{display:flex;gap:8px;justify-content:center}
+.btn{padding:14px 32px;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:16px;font-weight:700}
+.btn-start{background:#43A047}
+.btn-pause{background:#FF9100}
+.btn-reset{background:#FF5252}
+footer{text-align:center;color:var(--fg2);font-size:10px;padding:10px 0 6px}
+footer a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="title-bar">
+  <div style="display:flex;align-items:center;gap:10px"><h1>⏱️ FlowTimer</h1><span class="sub">永远的兰兰</span></div>
+  <div style="display:flex;gap:6px">
+    <a href="https://github.com/podcatcher962/FlowTimer/releases/latest" target="_blank" style="background:#4A148C;color:#fff;text-decoration:none;padding:6px 12px;border-radius:4px;font-size:12px;white-space:nowrap;font-weight:600">💻 桌面版</a>
+    <button onclick="toggleLang()" style="background:#4A148C;color:#fff;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px" id="langBtn">中/EN</button>
+  </div>
+</div>
+<div class="info-bar">
+  <a href="#" onclick="showModal('help');return false" id="linkHelp">📖 使用说明</a>
+  <a href="#" onclick="showModal('disclaimer');return false" id="linkDisc">⚠ 免责</a>
+  <a href="#" onclick="showModal('about');return false" id="linkAbout">ℹ 关于</a>
+</div>
+<div class="card">
+  <div class="timer" id="timerDisplay">25:00</div>
+  <div class="status" id="statusText">⏱ 番茄钟</div>
+  <div class="presets" id="presetBtns"></div>
+  <div class="custom-row">
+    <input id="customMin" type="number" value="25" min="1" max="120">
+    <button onclick="setCustom()" id="setBtn">设置</button>
+  </div>
+  <div class="btns">
+    <button class="btn btn-start" onclick="toggle()" id="startBtn">▶ 开始</button>
+    <button class="btn btn-reset" onclick="reset()" id="resetBtn">↺ 重置</button>
+  </div>
+</div>
+<footer><a href="https://github.com/podcatcher962/FlowTimer" target="_blank">github.com/podcatcher962/FlowTimer</a> · © 永远的兰兰</footer>
+<script>
+const T={zh:{start:'▶ 开始',pause:'⏸ 暂停',reset:'↺ 重置',status:'⏱ 番茄钟',focus:'⏳ 专注中...',paused:'⏸ 已暂停',done:'✅ 时间到!'},
+en:{start:'▶ Start',pause:'⏸ Pause',reset:'↺ Reset',status:'⏱ Pomodoro',focus:'⏳ Focusing...',paused:'⏸ Paused',done:'✅ Done!'}};
+const MOD={zh:{help:'1. 默认25分钟专注\n2. 点击「▶ 开始」倒计时\n3. 结束后自动提示音\n4. 预设按钮快速切换时长\n\n纯本地运行。',
+  disclaimer:'⚠️ 免责\n\n1. 纯本地计时工具。\n2. AS-IS 无担保。\n\n© 永远的兰兰',
+  about:'FlowTimer v1.0\n\n极简番茄钟\n桌面版: Python 3, 10MB\nWeb 版: 单文件 HTML\n\nGitHub: github.com/podcatcher962/FlowTimer\n© 永远的兰兰'},
+en:{help:'1. Default 25min focus\n2. Click Start\n3. Beep when done\n4. Presets for quick switch\n\nPure local.',
+  disclaimer:'Disclaimer\n\n1. Pure local timer.\n2. AS-IS.\n\n© forever-chitanda',
+  about:'FlowTimer v1.0\n\nMinimal Pomodoro\nDesktop: Python 3, 10MB\nWeb: Single-file HTML\n\nGitHub: github.com/podcatcher962/FlowTimer\n© forever-chitanda'}};
+let L='zh',total=1500,running=false,paused=false,timer=null;
+function t(k){return T[L][k]}
+const PRESETS=[25,15,5,45,10];
+function buildUI(){
+  document.getElementById('langBtn').textContent=L=='zh'?'中/EN':'EN/中';
+  document.getElementById('startBtn').textContent=t('start');
+  document.getElementById('resetBtn').textContent=t('reset');
+  document.getElementById('setBtn').textContent=L=='zh'?'设置':'Set';
+  var pb=document.getElementById('presetBtns');pb.innerHTML='';
+  PRESETS.forEach(function(m){
+    var b=document.createElement('button');b.className='preset-btn';b.textContent=m+(L=='zh'?'分钟':'min');
+    b.onclick=function(){setTime(m*60)};pb.appendChild(b);
+  });
+  document.getElementById('statusText').textContent=running?t('focus'):t('status');
+}
+function setTime(s){if(!running){total=s;updateDisplay()}}
+function updateDisplay(){
+  var m=Math.floor(total/60),s=total%60;
+  document.getElementById('timerDisplay').textContent=m.toString().padStart(2,'0')+':'+s.toString().padStart(2,'0');
+  document.getElementById('timerDisplay').classList.toggle('urgent',total<60&&running);
+}
+function setCustom(){
+  var v=parseInt(document.getElementById('customMin').value)||25;
+  setTime(v*60);
+}
+function toggle(){
+  if(!running){running=true;paused=false;document.getElementById('startBtn').textContent=t('pause');document.getElementById('startBtn').className='btn btn-pause';document.getElementById('statusText').textContent=t('focus');timer=setInterval(tick,1000)}
+  else if(!paused){paused=true;clearInterval(timer);document.getElementById('startBtn').textContent=t('start');document.getElementById('startBtn').className='btn btn-start';document.getElementById('statusText').textContent=t('paused')}
+  else{paused=false;document.getElementById('startBtn').textContent=t('pause');document.getElementById('startBtn').className='btn btn-pause';document.getElementById('statusText').textContent=t('focus');timer=setInterval(tick,1000)}
+}
+function tick(){
+  if(total>0){total--;updateDisplay()}
+  if(total<=0){clearInterval(timer);running=false;document.getElementById('statusText').textContent=t('done');document.getElementById('startBtn').textContent=t('start');document.getElementById('startBtn').className='btn btn-start';try{var ctx=new AudioContext();var o=ctx.createOscillator();o.frequency.value=800;o.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.3)}catch(e){}}
+}
+function reset(){clearInterval(timer);running=false;paused=false;total=1500;updateDisplay();document.getElementById('startBtn').textContent=t('start');document.getElementById('startBtn').className='btn btn-start';document.getElementById('statusText').textContent=t('status');document.getElementById('timerDisplay').classList.remove('urgent')}
+function toggleLang(){L=L=='zh'?'en':'zh';buildUI()}
+function showModal(k){
+  document.getElementById('modalTitle').textContent=k==='help'?'📖 FlowTimer':k==='disclaimer'?'⚠️ Disclaimer':'ℹ About';
+  document.getElementById('modalBody').textContent=MOD[L][k];
+  document.getElementById('modalOverlay').style.display='flex';
+  document.getElementById('modalOverlay').onclick=function(e){if(e.target===this)this.style.display='none'};
+}
+buildUI();updateDisplay();
+</script>
+<div id="modalOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#FFF;border-radius:10px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,0.2);font-size:13px;line-height:1.7">
+    <h2 style="margin:0 0 12px;font-size:18px" id="modalTitle"></h2>
+    <div id="modalBody" style="white-space:pre-wrap"></div>
+    <button onclick="document.getElementById('modalOverlay').style.display='none'" style="margin-top:16px;padding:8px 24px;background:var(--accent);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:14px">✕ 关闭</button>
+  </div>
+</div>
+</body>
+</html>
